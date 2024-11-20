@@ -9,9 +9,9 @@ BLACKLIST_ZIP_PATH = "/tmp/full_blacklist_database.zip"
 BLACKLIST_TXT_PATH = "/tmp/full_blacklist_database.txt"
 
 def install_dependencies():
-    """Install required packages for iptables, Apache modules, and requests."""
+    """Install required packages for iptables and requests."""
     print("Installing dependencies...")
-    subprocess.run(["sudo", "yum", "-y", "install", "iptables-services", "mod_evasive", "httpd"])
+    subprocess.run(["sudo", "yum", "-y", "install", "iptables-services", "httpd"])
     subprocess.run(["sudo", "pip3", "install", "requests"])
 
 def download_blacklist():
@@ -30,18 +30,20 @@ def unzip_blacklist():
     print("Blacklist unzipped.")
 
 def parse_blacklist():
-    """Parse the blacklist and return a set of valid IPs."""
+    """Parse the blacklist file and extract valid IPs."""
     valid_ips = set()
     with open(BLACKLIST_TXT_PATH, "r") as f:
         for line in f:
-            ip = line.strip()
-            if ip and not ip.startswith("#"):  # Ignore comments and empty lines
+            line = line.strip()
+            if line and not line.startswith("#"):
+                # Extract IP part before any comment
+                ip = line.split("#")[0].strip()
                 try:
-                    ipaddress.ip_address(ip)  # Validate IP
+                    ipaddress.ip_address(ip)  # Validate if it's a valid IP address
                     valid_ips.add(ip)
                 except ValueError:
                     print(f"Invalid IP skipped: {ip}")
-    print(f"{len(valid_ips)} valid IPs parsed from blacklist.")
+    print(f"{len(valid_ips)} valid IPs parsed from the blacklist.")
     return valid_ips
 
 def block_ip(ip):
@@ -88,26 +90,6 @@ def refined_rate_limit():
                     "ESTABLISHED,RELATED", "-j", "ACCEPT"])
     subprocess.run(["sudo", "iptables", "-A", "INPUT", "-j", "DROP"])
 
-def configure_mod_evasive():
-    """Configure Apache's mod_evasive module for rate limiting."""
-    print("Configuring mod_evasive...")
-    mod_evasive_conf = """
-<IfModule mod_evasive20.c>
-    DOSHashTableSize 3097
-    DOSPageCount 20
-    DOSSiteCount 200
-    DOSPageInterval 1
-    DOSSiteInterval 1
-    DOSBlockingPeriod 10
-    DOSEmailNotify nasirhussainclg@gmail.com
-    DOSLogDir "/var/log/mod_evasive"
-</IfModule>
-"""
-    with open("/etc/httpd/conf.d/mod_evasive.conf", "w") as f:
-        f.write(mod_evasive_conf)
-    subprocess.run(["sudo", "systemctl", "restart", "httpd"])
-    print("mod_evasive configured and Apache restarted.")
-
 def setup_security_group():
     """Configure AWS Security Group (if AWS CLI is installed and configured)."""
     print("Configuring AWS Security Group...")
@@ -127,9 +109,8 @@ def main():
     ip_list = parse_blacklist()
     apply_blacklist(ip_list)
     refined_rate_limit()
-    configure_mod_evasive()
     setup_security_group()
-    print("Firewall, Apache, and Security Group configuration complete.")
+    print("Firewall and Security Group configuration complete.")
 
 if __name__ == "__main__":
     main()
