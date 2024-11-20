@@ -98,7 +98,7 @@ def configure_mod_evasive():
 def setup_security_group():
     """Configure AWS Security Group (if AWS CLI is installed and configured)."""
     print("Configuring AWS Security Group...")
-    security_group_id = "YOUR_SECURITY_GROUP_ID"  # Replace with your SG ID
+    security_group_id = "sg-0bc74359cce8c747a"  # Replace with your SG ID
     # Allow HTTP, HTTPS, and SSH
     subprocess.run(["aws", "ec2", "authorize-security-group-ingress", "--group-id", security_group_id,
                     "--protocol", "tcp", "--port", "80", "--cidr", "0.0.0.0/0"])
