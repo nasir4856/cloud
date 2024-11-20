@@ -86,7 +86,7 @@ def configure_mod_evasive():
     DOSPageInterval 1
     DOSSiteInterval 1
     DOSBlockingPeriod 10
-    DOSEmailNotify youremail@example.com
+    DOSEmailNotify nasirhussainclg@gmail.com
     DOSLogDir "/var/log/mod_evasive"
 </IfModule>
 """
@@ -105,7 +105,7 @@ def setup_security_group():
     subprocess.run(["aws", "ec2", "authorize-security-group-ingress", "--group-id", security_group_id,
                     "--protocol", "tcp", "--port", "443", "--cidr", "0.0.0.0/0"])
     subprocess.run(["aws", "ec2", "authorize-security-group-ingress", "--group-id", security_group_id,
-                    "--protocol", "tcp", "--port", "22", "--cidr", "YOUR_IP/32"])  # Replace YOUR_IP with your own IP
+                    "--protocol", "tcp", "--port", "22", "--cidr", "0.0.0.0/0"])  # Replace YOUR_IP with your own IP
     print("AWS Security Group configured.")
 
 def main():
