@@ -2,7 +2,7 @@ import os
 import subprocess
 import requests
 import zipfile
-import time
+import ipaddress
 
 BLACKLIST_URL = "https://myip.ms/files/blacklist/general/full_blacklist_database.zip"
 BLACKLIST_ZIP_PATH = "/tmp/full_blacklist_database.zip"
@@ -30,27 +30,40 @@ def unzip_blacklist():
     print("Blacklist unzipped.")
 
 def parse_blacklist():
-    """Parse the blacklist and return a set of IPs."""
+    """Parse the blacklist and return a set of valid IPs."""
+    valid_ips = set()
     with open(BLACKLIST_TXT_PATH, "r") as f:
-        ip_list = {line.strip() for line in f if line.strip() and not line.startswith("#")}
-    print(f"{len(ip_list)} IPs parsed from blacklist.")
-    return ip_list
+        for line in f:
+            ip = line.strip()
+            if ip and not ip.startswith("#"):  # Ignore comments and empty lines
+                try:
+                    ipaddress.ip_address(ip)  # Validate IP
+                    valid_ips.add(ip)
+                except ValueError:
+                    print(f"Invalid IP skipped: {ip}")
+    print(f"{len(valid_ips)} valid IPs parsed from blacklist.")
+    return valid_ips
 
 def block_ip(ip):
     """Block a single IP using iptables."""
-    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"])
-    print(f"Blocked IP: {ip}")
+    result = subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"], capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"Failed to block IP {ip}: {result.stderr}")
+    else:
+        print(f"Blocked IP: {ip}")
 
 def apply_blacklist(ip_list):
     """Apply the blacklist by blocking each IP."""
     print("Applying blacklist...")
+    subprocess.run(["sudo", "iptables", "-F"])  # Flush existing rules
     for ip in ip_list:
+        print(f"Processing IP: {ip}")
         block_ip(ip)
 
 def refined_rate_limit():
     """Apply refined rate limits using iptables."""
     print("Setting refined rate limits with iptables...")
-    subprocess.run(["sudo", "iptables", "-F"])
+    subprocess.run(["sudo", "iptables", "-F"])  # Clear existing rules
     subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", "127.0.0.1", "-j", "ACCEPT"])
 
     # HTTP rate limiting - 20 req/min with burst limit of 50
@@ -98,14 +111,13 @@ def configure_mod_evasive():
 def setup_security_group():
     """Configure AWS Security Group (if AWS CLI is installed and configured)."""
     print("Configuring AWS Security Group...")
-    security_group_id = "sg-0bc74359cce8c747a"  # Replace with your SG ID
-    # Allow HTTP, HTTPS, and SSH
+    security_group_id = "sg-0bc74359cce8c747a"  # Replace with your Security Group ID
     subprocess.run(["aws", "ec2", "authorize-security-group-ingress", "--group-id", security_group_id,
                     "--protocol", "tcp", "--port", "80", "--cidr", "0.0.0.0/0"])
     subprocess.run(["aws", "ec2", "authorize-security-group-ingress", "--group-id", security_group_id,
                     "--protocol", "tcp", "--port", "443", "--cidr", "0.0.0.0/0"])
     subprocess.run(["aws", "ec2", "authorize-security-group-ingress", "--group-id", security_group_id,
-                    "--protocol", "tcp", "--port", "22", "--cidr", "0.0.0.0/0"])  # Replace YOUR_IP with your own IP
+                    "--protocol", "tcp", "--port", "22", "--cidr", "0.0.0.0/0"])
     print("AWS Security Group configured.")
 
 def main():
