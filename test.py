@@ -16,8 +16,23 @@ def install_dependencies():
 def refined_rate_limit():
     """Apply refined rate limits using iptables."""
     print("Setting refined rate limits with iptables...")
-    subprocess.run(["sudo", "iptables", "-F"])  # Clear existing rules
-    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", "127.0.0.1", "-j", "ACCEPT"])  # Allow local traffic
+
+    # Clear existing iptables rules to start fresh
+    subprocess.run(["sudo", "iptables", "-F"])
+
+    # Allow localhost traffic (important for server to function)
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", "127.0.0.1", "-j", "ACCEPT"])  # Local machine access
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-i lo", "-j ACCEPT"])  # Allow traffic on the loopback interface
+
+    # Allow incoming HTTP and HTTPS traffic (ports 80 and 443)
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-p", "tcp", "--dport", "80", "-j ACCEPT"])
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-p", "tcp", "--dport", "443", "-j ACCEPT"])
+
+    # Allow incoming SSH traffic (port 22)
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-p", "tcp", "--dport", "22", "-j ACCEPT"])
+
+    # Allow already established/related connections (e.g., responses to outgoing requests)
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-m state", "--state", "ESTABLISHED,RELATED", "-j ACCEPT"])
 
     # HTTP rate limiting - 20 req/min with burst limit of 50
     subprocess.run(["sudo", "iptables", "-A", "INPUT", "-p", "tcp", "--dport", "80",
@@ -33,17 +48,15 @@ def refined_rate_limit():
                     "-m", "state", "--state", "NEW", "-m", "recent", "--update",
                     "--seconds", "60", "--hitcount", "15", "-j", "DROP"])
 
-    # Allow already established/related connections (e.g., responses to outgoing requests)
-    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-m", "state", "--state",
-                    "ESTABLISHED,RELATED", "-j", "ACCEPT"])
-
     # Temporary ban for abusive IPs (rate-limited)
     subprocess.run(["sudo", "iptables", "-A", "INPUT", "-m", "recent", "--rcheck",
                     "--seconds", "300", "--hitcount", "50", "-j", "DROP"])
     subprocess.run(["sudo", "iptables", "-A", "INPUT", "-m", "recent", "--set"])
 
-    # Block all other traffic after the rate limits are applied
-    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-j", "DROP"])
+    # Block all other traffic after the rate limits are applied (except SSH, HTTP/HTTPS, internal)
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-j DROP"])
+
+    print("Rate limiting rules applied successfully.")
 
 def log_blocked_ip(ip):
     """Log the blocked IP to the log file."""
